@@ -184,6 +184,7 @@ public class InjectionCompiler extends AbstractProcessor {
 
 		for (SingletonElement<?> se : singletonElements) {
 			debug("Create Seringue code for " + se.packageName + "." + se.className);
+			final String lowerFirstClassName = CaseUtils.lowerFirst(se.className);
 			// create import
 			//
 			// import <PackageName>.<ClassName>;
@@ -195,18 +196,18 @@ public class InjectionCompiler extends AbstractProcessor {
 
 			// create static field to hold lazily created instance
 			//
-			// private static <ClassName> instanceOf<ClassName>;
+			// private static <ClassName> <className>;
 			sbFields.append("\tprivate static ");
 			sbFields.append(se.className);
-			sbFields.append(" instanceOf");
-			sbFields.append(se.className);
+			sbFields.append(" ");
+			sbFields.append(lowerFirstClassName);
 			sbFields.append(";\n");
 
 			// create static get method with lazy init
 			//
 			// public synchronized static <ClassName> get<ClassName>() {
-			// if(instanceOf<ClassName> == null) {
-			// instanceOf<ClassName> = new <ClassName>(get<DepClassName>()...);
+			// if(<className> == null) {
+			// <className> = new <ClassName>(get<DepClassName>()...);
 			// }
 			// return instanceOf<ClassName>;
 			// }
@@ -216,12 +217,12 @@ public class InjectionCompiler extends AbstractProcessor {
 			sbGetMethods.append(se.className);
 			sbGetMethods.append("() {\n");
 
-			sbGetMethods.append("\t\tif (instanceOf");
-			sbGetMethods.append(se.className);
+			sbGetMethods.append("\t\tif (");
+			sbGetMethods.append(lowerFirstClassName);
 			sbGetMethods.append(" == null) {\n");
 
-			sbGetMethods.append("\t\t\tinstanceOf");
-			sbGetMethods.append(se.className);
+			sbGetMethods.append("\t\t\t");
+			sbGetMethods.append(lowerFirstClassName);
 			sbGetMethods.append(" = new ");
 			sbGetMethods.append(se.className);
 			sbGetMethods.append("(");
@@ -231,8 +232,8 @@ public class InjectionCompiler extends AbstractProcessor {
 			sbGetMethods.append(");\n");
 
 			sbGetMethods.append("\t\t}\n");
-			sbGetMethods.append("\t\treturn instanceOf");
-			sbGetMethods.append(se.className);
+			sbGetMethods.append("\t\treturn ");
+			sbGetMethods.append(lowerFirstClassName);
 			sbGetMethods.append(";\n");
 			sbGetMethods.append("\t}\n\n");// get<ClassName> method end
 		}
