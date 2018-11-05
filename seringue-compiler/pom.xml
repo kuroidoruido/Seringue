@@ -3,7 +3,7 @@
   <parent>
     <groupId>nf.fr.k49.seringue</groupId>
     <artifactId>seringue-parent</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>seringue-compiler</artifactId>
   

@@ -16,6 +16,7 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
 import javax.tools.Diagnostic.Kind;
 
 import javax.lang.model.SourceVersion;
@@ -34,20 +35,22 @@ public class InjectionCompiler extends AbstractProcessor {
 		final List<SingletonElement<?>> singletonElements = new ArrayList<>();
 
 		extractAnnotationTargets(annotations, roundEnv, singletonElements);
-		info("Extract Annotated Elements: done");
-		fillSingletonElementDependencies(singletonElements);
-		info("Compute Dependency Tree: done");
-		final String seringueClass = createCustomSeringueInjector(singletonElements);
-		if (seringueClass != null) {
-			writeSeringueInFile(seringueClass);
+		if (!singletonElements.isEmpty()) {
+			info("Extract Annotated Elements: done");
+			fillSingletonElementDependencies(singletonElements);
+			info("Compute Dependency Tree: done");
+			final String seringueClass = createCustomSeringueInjector(singletonElements);
+			if (seringueClass != null) {
+				writeSeringueInFile(seringueClass);
+			}
+			info("Generate Custom Seringue Injector: done");
 		}
-		info("Generate Custom Seringue Injector: done");
-
 		return exitStatus;
 	}
 
 	private void extractAnnotationTargets(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv,
 			final List<SingletonElement<?>> singletonElements) {
+		debug("extractAnnotationTargets() started");
 		for (TypeElement te : annotations) {
 			for (Element element : roundEnv.getElementsAnnotatedWith(te)) {
 				final String teSimpleName = te.getSimpleName().toString();
@@ -64,36 +67,82 @@ public class InjectionCompiler extends AbstractProcessor {
 				se.className = classElement.getSimpleName().toString();
 				se.packageName = packageElement.getQualifiedName().toString();
 
+				// add as super type all super classes
+				for (TypeElement cur = getSuperType(classElement); //
+						!"java.lang.Object".equals(cur.getQualifiedName().toString()); //
+						cur = getSuperType(cur)) {
+					debug("Found superclass " + cur.getQualifiedName() + " for " + se.packageName + "." + se.className);
+					se.superTypes.add(cur.getQualifiedName().toString());
+				}
+				// add as super type all interfaces
+				se.superTypes.addAll(classElement.getInterfaces().stream()//
+						.map(i -> (TypeElement) ((DeclaredType) i).asElement())//
+						.map(e -> e.getQualifiedName().toString())//
+						.collect(Collectors.toList())//
+				);
+
 				singletonElements.add(se);
 			}
 		}
+		debug("extractAnnotationTargets() end");
+	}
+
+	private static TypeElement getSuperType(TypeElement te) {
+		return (TypeElement) ((DeclaredType) te.getSuperclass()).asElement();
 	}
 
 	private void fillSingletonElementDependencies(final List<SingletonElement<?>> singletonElements) {
+		debug("fillSingletonElementDependencies() start");
 		final List<SingletonElement<?>> input = new ArrayList<>(singletonElements.size());
 		input.addAll(singletonElements);
 
 		final Map<String, SingletonElement<?>> filled = new HashMap<>();
+		int loopCounter = singletonElements.size();
 		while (!input.isEmpty()) {
+			if (loopCounter < 0) {
+				err("Impossible to fill these classes: " + input + "\nwith these singletons: " + filled.keySet());
+				break;
+			}
 			final Iterator<SingletonElement<?>> it = input.iterator();
 			while (it.hasNext()) {
 				final SingletonElement<?> se = it.next();
+				debug("Filling " + se.packageName + "." + se.className);
 
 				if (se.constructorParams.isEmpty()) {
+					debug("   marked as filled (no dependencies)");
 					filled.put(se.packageName + "." + se.className, se);
+					declareSingletonForEachSuperTypes(filled, se.superTypes, se);
 					it.remove();
 				} else if (se.constructorParams.stream().allMatch(cp -> filled.containsKey(cp))) {
+					debug("   cannot be filled yet (all dependencies are filled)");
 					se.dependencies = se.constructorParams.stream()//
 							.map(cp -> filled.get(cp))//
 							.collect(Collectors.toList());
 					filled.put(se.packageName + "." + se.className, se);
+					declareSingletonForEachSuperTypes(filled, se.superTypes, se);
 					it.remove();
+				} else {
+					debug("   cannot be filled yet");
 				}
+			}
+			loopCounter--;
+		}
+		debug("fillSingletonElementDependencies() end");
+	}
+
+	private void declareSingletonForEachSuperTypes(final Map<String, SingletonElement<?>> map, final List<String> keys,
+			final SingletonElement<?> value) {
+		SingletonElement<?> old = null;
+		for (String k : keys) {
+			if ((old = map.put(k, value)) != null) {
+				warn("Cannot be sure about which implementation of " + k + " will used between " //
+						+ old.packageName + "." + old.className + " and " + value.packageName + "." + value.className);
 			}
 		}
 	}
 
 	private String createCustomSeringueInjector(List<SingletonElement<?>> singletonElements) {
+		debug("createCustomSeringueInjector() start");
 		if (singletonElements.isEmpty()) {
 			return null;
 		}
@@ -104,6 +153,7 @@ public class InjectionCompiler extends AbstractProcessor {
 		final StringBuilder sbGetMethods = new StringBuilder();
 
 		for (SingletonElement<?> se : singletonElements) {
+			debug("Create Seringue code for " + se.packageName + "." + se.className);
 			// create import
 			//
 			// import <PackageName>.<ClassName>;
@@ -165,10 +215,12 @@ public class InjectionCompiler extends AbstractProcessor {
 		sbSeringueClass.append("\n");
 		sbSeringueClass.append(sbGetMethods.toString());
 		sbSeringueClass.append("}");// class end
+		debug("createCustomSeringueInjector() end");
 		return sbSeringueClass.toString();
 	}
 
 	private void writeSeringueInFile(final String seringueClass) {
+		debug("writeSeringueInFile() start");
 		final Filer filer = processingEnv.getFiler();
 
 		try (final PrintWriter pw = new PrintWriter(
@@ -177,10 +229,19 @@ public class InjectionCompiler extends AbstractProcessor {
 		} catch (IOException e) {
 			err("Impossible to create class nf.fr.k49.seringue.Seringue. " + e);
 		}
+		debug("writeSeringueInFile() end");
+	}
+
+	private void debug(String msg) {
+		// System.out.println("[DEBUG] " + msg);
 	}
 
 	private void info(String msg) {
 		processingEnv.getMessager().printMessage(Kind.NOTE, msg);
+	}
+
+	private void warn(String msg) {
+		processingEnv.getMessager().printMessage(Kind.WARNING, msg);
 	}
 
 	private void err(String msg) {

@@ -9,11 +9,14 @@ public class SingletonElement<T> {
 
 	String packageName;
 	String className;
+	List<String> superTypes;
+
 	List<String> constructorParams;
 
 	List<SingletonElement<?>> dependencies;
 
 	SingletonElement() {
+		this.superTypes = new ArrayList<>();
 		this.constructorParams = new ArrayList<>();
 		this.dependencies = new ArrayList<>();
 	}

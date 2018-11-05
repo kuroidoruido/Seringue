@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>nf.fr.k49.seringue</groupId>
 	<artifactId>seringue-parent</artifactId>
-	<version>0.1.0</version>
+	<version>0.2.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<name>Seringue is a Static Dependency Injector with no dependancies.</name>
 

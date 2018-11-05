@@ -13,5 +13,6 @@ public class App {
 		System.out.println(Seringue.getC().getWho());
 		System.out.println(Seringue.getD());
 		System.out.println(Seringue.getD().print());
+		System.out.println(Seringue.getJ().printAll());
 	}
 }
