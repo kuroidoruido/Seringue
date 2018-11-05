@@ -1,0 +1,43 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>nf.fr.k49.seringue</groupId>
+		<artifactId>seringue-parent</artifactId>
+		<version>0.1.0</version>
+	</parent>
+	<artifactId>seringue-demo-app</artifactId>
+
+	<dependencies>
+		<dependency>
+			<groupId>nf.fr.k49.seringue</groupId>
+			<artifactId>seringue-annotations</artifactId>
+			<version>${project.parent.version}</version>
+			<scope>compile</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.8.0</version>
+				<configuration>
+					<showWarnings>true</showWarnings>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>nf.fr.k49.seringue</groupId>
+							<artifactId>seringue-compiler</artifactId>
+							<version>${project.parent.version}</version>
+						</path>
+					</annotationProcessorPaths>
+					<annotationProcessors>
+						<annotationProcessor>nf.fr.k49.seringue.compiler.InjectionCompiler</annotationProcessor>
+					</annotationProcessors>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+</project>
