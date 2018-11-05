@@ -1,4 +1,4 @@
-package nf.fr.k49.seringue.test.app;
+package nf.fr.k49.seringue.test.app.simple;
 
 import nf.fr.k49.seringue.annotations.Singleton;
 

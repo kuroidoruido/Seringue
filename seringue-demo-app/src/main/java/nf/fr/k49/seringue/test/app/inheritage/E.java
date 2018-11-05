@@ -1,4 +1,4 @@
-package nf.fr.k49.seringue.test.app;
+package nf.fr.k49.seringue.test.app.inheritage;
 
 public abstract class E {
 

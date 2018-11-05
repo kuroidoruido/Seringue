@@ -19,36 +19,66 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.tools.Diagnostic.Kind;
 
+import nf.fr.k49.seringue.annotations.SeringueApp;
+
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.PackageElement;
 
-@SupportedAnnotationTypes(value = { "nf.fr.k49.seringue.annotations.Singleton" })
+@SupportedAnnotationTypes(value = { "nf.fr.k49.seringue.annotations.Singleton",
+		"nf.fr.k49.seringue.annotations.SeringueApp" })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class InjectionCompiler extends AbstractProcessor {
 
 	private boolean exitStatus = true;
+	private String seringueInjectorPackage = null;
 
 	@Override
 	public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 		final List<SingletonElement<?>> singletonElements = new ArrayList<>();
 
-		extractAnnotationTargets(annotations, roundEnv, singletonElements);
-		if (!singletonElements.isEmpty()) {
-			info("Extract Annotated Elements: done");
-			fillSingletonElementDependencies(singletonElements);
-			info("Compute Dependency Tree: done");
-			final String seringueClass = createCustomSeringueInjector(singletonElements);
-			if (seringueClass != null) {
-				writeSeringueInFile(seringueClass);
+		if (seringueInjectorPackage == null) {
+			seringueInjectorPackage = extractSeringueAppAnnotation(annotations, roundEnv);
+		}
+		if (exitStatus) {
+			extractAnnotationTargets(annotations, roundEnv, singletonElements);
+			if (!singletonElements.isEmpty()) {
+				info("Extract Annotated Elements: done");
+				fillSingletonElementDependencies(singletonElements);
+				info("Compute Dependency Tree: done");
+				final String seringueClass = createCustomSeringueInjector(singletonElements);
+				if (seringueClass != null) {
+					writeSeringueInFile(seringueClass);
+				}
+				info("Generate Custom Seringue Injector: done");
 			}
-			info("Generate Custom Seringue Injector: done");
 		}
 		return exitStatus;
 	}
 
-	private void extractAnnotationTargets(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv,
+	private String extractSeringueAppAnnotation(final Set<? extends TypeElement> annotations,
+			final RoundEnvironment roundEnv) {
+		final Iterator<? extends TypeElement> it = annotations.iterator();
+		while (it.hasNext()) {
+			final TypeElement ano = it.next();
+			if (SeringueApp.class.getSimpleName().equals(ano.getSimpleName().toString())) {
+				final Set<? extends Element> classes = roundEnv.getElementsAnnotatedWith(ano);
+				if (classes.size() != 1) {
+					break;
+				}
+
+				it.remove();
+				final TypeElement mainClassElement = (TypeElement) classes.toArray()[0];
+				final PackageElement mainClassPackageElement = (PackageElement) mainClassElement.getEnclosingElement();
+				return mainClassPackageElement.getQualifiedName().toString();
+			}
+		}
+		err("You must use @SeringueApp annotation on your main class.");
+		return null;
+	}
+
+	private void extractAnnotationTargets(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv,
 			final List<SingletonElement<?>> singletonElements) {
 		debug("extractAnnotationTargets() started");
 		for (TypeElement te : annotations) {
@@ -207,7 +237,9 @@ public class InjectionCompiler extends AbstractProcessor {
 			sbGetMethods.append("\t}\n\n");// get<ClassName> method end
 		}
 
-		sbSeringueClass.append("package nf.fr.k49.seringue;\n\n");
+		sbSeringueClass.append("package ");
+		sbSeringueClass.append(this.seringueInjectorPackage);
+		sbSeringueClass.append(";\n\n");
 		sbSeringueClass.append(sbImports.toString());
 		sbSeringueClass.append("\n");
 		sbSeringueClass.append("public class Seringue {\n");
@@ -222,10 +254,11 @@ public class InjectionCompiler extends AbstractProcessor {
 	private void writeSeringueInFile(final String seringueClass) {
 		debug("writeSeringueInFile() start");
 		final Filer filer = processingEnv.getFiler();
+		final String seringueQualifiedName = this.seringueInjectorPackage + ".Seringue";
 
-		try (final PrintWriter pw = new PrintWriter(
-				filer.createSourceFile("nf.fr.k49.seringue.Seringue").openOutputStream())) {
+		try (final PrintWriter pw = new PrintWriter(filer.createSourceFile(seringueQualifiedName).openOutputStream())) {
 			pw.println(seringueClass);
+			info("Seringue injector class was created with name: " + seringueQualifiedName);
 		} catch (IOException e) {
 			err("Impossible to create class nf.fr.k49.seringue.Seringue. " + e);
 		}

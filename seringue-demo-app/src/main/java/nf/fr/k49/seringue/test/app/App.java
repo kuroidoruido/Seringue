@@ -1,7 +1,8 @@
 package nf.fr.k49.seringue.test.app;
 
-import nf.fr.k49.seringue.Seringue;
+import nf.fr.k49.seringue.annotations.SeringueApp;
 
+@SeringueApp
 public class App {
 
 	public static void main(String[] args) {
