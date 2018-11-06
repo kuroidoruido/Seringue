@@ -3,6 +3,7 @@ package nf.fr.k49.seringue.compiler;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -20,6 +21,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.tools.Diagnostic.Kind;
 
 import nf.fr.k49.seringue.annotations.SeringueApp;
+import nf.fr.k49.seringue.annotations.Singleton;
 
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
@@ -87,6 +89,8 @@ public class InjectionCompiler extends AbstractProcessor {
 				final TypeElement classElement = (TypeElement) element.getEnclosingElement();
 				final PackageElement packageElement = (PackageElement) classElement.getEnclosingElement();
 				info("Treat " + classElement.getQualifiedName().toString() + " for annotation " + teSimpleName);
+				final List<String> ignoredSuperType = Arrays
+						.asList(element.getAnnotation(Singleton.class).ignoreSuperType());
 
 				final SingletonElement<?> se = new SingletonElement<>();
 
@@ -101,13 +105,19 @@ public class InjectionCompiler extends AbstractProcessor {
 				for (TypeElement cur = getSuperType(classElement); //
 						!"java.lang.Object".equals(cur.getQualifiedName().toString()); //
 						cur = getSuperType(cur)) {
-					debug("Found superclass " + cur.getQualifiedName() + " for " + se.packageName + "." + se.className);
-					se.superTypes.add(cur.getQualifiedName().toString());
+					final String curQualifiedName = cur.getQualifiedName().toString();
+					final boolean ignored = ignoredSuperType.contains(curQualifiedName);
+					debug("Found superclass " + cur.getQualifiedName() + " for " + se.packageName + "." + se.className//
+							+ (ignored ? " but it is ignored" : ""));
+					if (!ignored) {
+						se.superTypes.add(curQualifiedName);
+					}
 				}
 				// add as super type all interfaces
 				se.superTypes.addAll(classElement.getInterfaces().stream()//
 						.map(i -> (TypeElement) ((DeclaredType) i).asElement())//
 						.map(e -> e.getQualifiedName().toString())//
+						.filter(e -> !ignoredSuperType.contains(e))//
 						.collect(Collectors.toList())//
 				);
 

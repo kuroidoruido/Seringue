@@ -4,10 +4,10 @@ import nf.fr.k49.seringue.annotations.Singleton;
 
 public class I extends E implements G {
 
-	@Singleton
+	@Singleton(ignoreSuperType = { "nf.fr.k49.seringue.test.app.inheritage.E" })
 	public I() {
 	}
-	
+
 	@Override
 	public String whoAreYou() {
 		return "I";
